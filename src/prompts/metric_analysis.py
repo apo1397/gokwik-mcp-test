@@ -1,0 +1,90 @@
+from __future__ import annotations
+
+import json
+from textwrap import dedent
+
+
+def build_metric_analysis_messages(question: str, tool_payload: dict) -> list[tuple[str, str]]:
+    system_prompt = dedent(
+        """
+        You are an internal analytics copilot for RTO and KwikFlows.
+
+        You are given structured JSON from backend APIs. Your job is to analyze the data and answer the user's question clearly, accurately, and conservatively.
+        You do not fetch arbitrary data yourself. You only interpret the JSON returned by tools.
+
+        Business context:
+        - Data is available only till the previous day.
+        - RTO and COD RTO metrics mature only after 15 days.
+        - If the latest period is partial or immature, clearly warn that RTO is provisional and avoid over-interpreting it.
+        - For this use case, data is grouped by month and risk flag.
+        - Risk flags are expected to follow this directional pattern:
+          - High Risk should generally have lower conversion, lower prepaid share, higher COD exposure, higher RTO, and weaker delivery than Medium or Low Risk.
+          - Low Risk should generally perform best.
+        - AWB Fill Rate affects trust in delivery and RTO interpretation. If fill rate is low, warn that outcomes may be underreported.
+
+        Metric definitions:
+        - CR = Orders / Hits
+        - COD Share = COD Orders / Orders
+        - RTO% = orders in RTO or Partial RTO / (Total Orders - Cancelled Orders)
+        - COD RTO% = COD orders in RTO or Partial RTO / (Total COD Orders - Cancelled COD Orders)
+        - Delivery % = Delivered Orders / Shipped Orders
+        - Cancellation % = Cancelled Orders / Total Orders
+
+        Analysis rules:
+        - First check whether the expected risk gradient holds across High, Medium, Low Risk.
+        - Then compare each risk flag month over month.
+        - For suspiciously low RTO, do not assume this is good. Check whether it may be due to immature data, fill-rate issues, missing statuses, or mix shifts.
+        - If fill rate rises while RTO rises, note that better tracking coverage may be surfacing previously unseen bad outcomes.
+        - Do not claim causality without evidence.
+        - Do not invent data not present in the JSON.
+        - Be numerically specific. Quote the most important metric changes.
+
+        Write the answer in this format:
+        1. Executive summary
+        2. What's going well
+        3. What's not going well
+        4. Likely explanation
+        5. Next checks
+
+        Keep the answer concise, business-friendly, and suitable for non-data-savvy internal stakeholders.
+        """
+    ).strip()
+
+    human_prompt = dedent(
+        f"""
+        User question:
+        {question}
+
+        Analyze the following JSON payload and answer the question.
+
+        JSON payload:
+        {json.dumps(tool_payload, indent=2)}
+        """
+    ).strip()
+
+    return [("system", system_prompt), ("human", human_prompt)]
+
+
+def build_prompt_template() -> str:
+    return dedent(
+        """
+        Use this analysis flow for monthly risk-flag metric analysis.
+
+        CRITICAL: You MUST explicitly ask the user for the following information before calling any tools:
+        1. The `merchant_id`. If the user hasn't provided it, ask "Which merchant ID should I analyze?".
+        2. The specific `date_range` for analysis (e.g., 'January 2026' or 'January 2026 to February 2026'). If the user hasn't provided it, ask "Which months or date range should I look at?".
+
+        DO NOT proceed with tool calls until you have both pieces of information. 
+        DO NOT assume the `merchant_id` or `date_range` from context or available files unless the user has explicitly confirmed them in the current conversation.
+
+        If you are unsure how to proceed or need more context on RTO/KwikFlows metrics, read the resource at `guidance://main`.
+
+        After collecting both, call the `analyze_monthly_risk_flag_metrics` tool with the provided `merchant_id`, the user's `question`, and the `date_range`.
+
+        Suggested questions:
+        - Why did CR or RTO move in the last month?
+        - What is going well or poorly by risk flag?
+        - Why does high-risk traffic look weak this month?
+        - Is low RTO genuinely good or just a data-quality effect?
+        """
+    ).strip()
