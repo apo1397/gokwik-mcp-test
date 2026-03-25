@@ -49,6 +49,13 @@ def get_guidance() -> str:
         return f.read()
 
 
+@mcp.resource("business_context://main")
+def get_business_context() -> str:
+    """Provides business logic and benchmarks for GoKwik metrics."""
+    with open("resources/business_context.md", "r") as f:
+        return f.read()
+
+
 @mcp.prompt(
     name="monthly_risk_flag_analysis",
     description="Collect the merchant_id and user's analysis question, then use the monthly risk-flag analysis tool.",

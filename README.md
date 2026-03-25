@@ -73,6 +73,7 @@ Add the following to your configuration:
 - [src/prompts/metric_analysis.py](src/prompts/metric_analysis.py): LLM analysis logic and prompt templates.
 - [src/services/metric_analysis_service.py](src/services/metric_analysis_service.py): Orchestration layer.
 - [resources/guidance.md](resources/guidance.md): Built-in domain guide.
+- [resources/business_context.md](resources/business_context.md): Detailed GoKwik business logic and benchmarks.
 
 ## License
 Proprietary - GoKwik Internal Use.

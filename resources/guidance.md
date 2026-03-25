@@ -27,6 +27,6 @@ If a user asks a general question like "How is my business doing?" without provi
 
 ## Troubleshooting
 
--   **Empty Results**: If a tool returns no data, check if the `merchant_id` exists in the `sample_data/risk_flag_summary.csv` file.
+-   **Empty Results**: If a tool returns no data, verify the `merchant_mid` and `merchant_int_id` with the user.
 -   **Data Maturity**: RTO metrics take about 15 days to "mature". If analyzing the current month, warn the user that the numbers might change as more delivery attempts are made.
 -   **AWB Fill Rate**: If this is low, it means tracking data is missing, and the reported RTO might be lower than reality.

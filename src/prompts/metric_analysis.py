@@ -31,22 +31,22 @@ def build_metric_analysis_messages(question: str, tool_payload: dict) -> list[tu
         - Cancellation % = Cancelled Orders / Total Orders
 
         Analysis rules:
+        - Be extremely precise and concise. Avoid wordy introductions or filler.
         - First check whether the expected risk gradient holds across High, Medium, Low Risk.
         - Then compare each risk flag month over month.
         - For suspiciously low RTO, do not assume this is good. Check whether it may be due to immature data, fill-rate issues, missing statuses, or mix shifts.
         - If fill rate rises while RTO rises, note that better tracking coverage may be surfacing previously unseen bad outcomes.
         - Do not claim causality without evidence.
         - Do not invent data not present in the JSON.
-        - Be numerically specific. Quote the most important metric changes.
+        - Be numerically specific. Quote only the most significant metric changes.
 
-        Write the answer in this format:
-        1. Executive summary
-        2. What's going well
-        3. What's not going well
-        4. Likely explanation
-        5. Next checks
+        Write the answer in this compact format:
+        1. **Summary**: (Max 2 sentences)
+        2. **Insights**: (Bullet points of key findings - max 4)
+        3. **Explanation**: (Likely cause in 1-2 sentences)
+        4. **Next Steps**: (Specific action items - max 2)
 
-        Keep the answer concise, business-friendly, and suitable for non-data-savvy internal stakeholders.
+        Keep the answer very brief, business-friendly, and suitable for internal stakeholders who need quick answers.
         """
     ).strip()
 
@@ -78,7 +78,7 @@ def build_prompt_template() -> str:
         DO NOT proceed with tool calls until you have all three pieces of information. 
         DO NOT assume the merchant identifiers or `date_range` from context unless the user has explicitly confirmed them.
 
-        If you are unsure how to proceed or need more context on RTO/KwikFlows metrics, read the resource at `guidance://main`.
+        Read `guidance://main` for troubleshooting and `business_context://main` for GoKwik-specific metric benchmarks.
 
         After collecting all three, call the `analyze_monthly_risk_flag_metrics` tool with the provided `merchant_mid`, `merchant_int_id`, the user's `question`, and the `date_range`.
 

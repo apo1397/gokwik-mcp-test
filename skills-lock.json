@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "brainstorming": {
+      "source": "smithery.ai",
+      "sourceType": "well-known",
+      "computedHash": "efddfd0efbd0e7b5075c5a66ff91a706ac506c88c7b5ddd7fd45a351cb3fe3af"
+    },
+    "prd": {
+      "source": "smithery.ai",
+      "sourceType": "well-known",
+      "computedHash": "1f3e1f005fc40fda85d250ae906c8ee4f7e8e833e23adfeca6542c19609fd7cd"
+    },
+    "senior-fullstack": {
+      "source": "smithery.ai",
+      "sourceType": "well-known",
+      "computedHash": "ba1e155eb5772e59e4f4ce1805538940d5725c1edf14fbd0eb0e0ec249767194"
+    }
+  }
+}
