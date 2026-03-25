@@ -5,9 +5,9 @@ from pydantic import BaseModel, Field
 
 
 class MetricAnalysisRequest(BaseModel):
-    merchant_id: str = Field(..., description="Merchant identifier to scope the query")
+    merchant_mid: str = Field(..., description="Merchant alphanumeric identifier (merchant-mid)")
+    merchant_int_id: int = Field(..., description="Merchant integer identifier (merchant-int-id)")
     question: str = Field(..., description="The user's natural-language analysis question")
-    input_path: str = Field(..., description="CSV or JSON file path for the mock tool")
     analysis_today: str = Field(..., description="Reference date in YYYY-MM-DD format")
     date_range: str | None = Field(None, description="The specific time frame for analysis (e.g., 'January 2026' or 'January 2026 to February 2026')")
     grain: Literal["month"] = "month"

@@ -1,71 +1,58 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import requests
 
 MONTH_FORMAT = "%B %Y"
 
 
 COLUMN_MAP = {
-    "DATE": "date",
-    "RISK FLAG": "risk_flag",
-    "RTO API HITS": "rto_api_hits",
-    "ORDERS": "orders",
-    "COD ORDERS": "cod_orders",
-    "RTO COD %": "rto_cod_pct",
-    "RTO % (OVERALL)": "rto_pct_overall",
-    "PREPAID SHARE %": "prepaid_share_pct",
-    "AWB FILL RATE %": "awb_fill_rate_pct",
-    "DELIVERED ORDERS %": "delivered_orders_pct",
-    "CANCELLED ORDERS %": "cancelled_orders_pct",
+    "date": "date",
+    "risk_flag": "risk_flag",
+    "total_hits": "rto_api_hits",
+    "total_orders": "orders",
+    "cod_orders": "cod_orders",
+    "total_rto_orders": "rto_orders",
+    "total_delivered_orders": "delivered_orders",
+    "total_cancelled_orders": "cancelled_orders",
 }
 
 
-def load_input_file(path: str, merchant_id: str | None = None, date_range: str | None = None) -> list[dict[str, Any]]:
-    file_path = Path(path)
-    if not file_path.exists():
-        raise FileNotFoundError(f"Input file not found: {path}")
+def fetch_api_data(
+    base_url: str,
+    auth_token: str,
+    merchant_mid: str,
+    merchant_int_id: int,
+    from_date: str = "2026-01-01",
+    to_date: str = "2026-03-24",
+) -> list[dict[str, Any]]:
+    headers = {
+        "Authorization": auth_token,
+        "merchant-mid": merchant_mid,
+        "merchant-int-id": str(merchant_int_id),
+        "user-type": "admin",
+    }
+    params = {
+        "rto_segment": "all",
+        "filter_type": "risk_flag",
+        "from_date": from_date,
+        "to_date": to_date,
+    }
 
-    suffix = file_path.suffix.lower()
-    if suffix == ".csv":
-        df = pd.read_csv(file_path)
-    elif suffix == ".json":
-        with open(file_path, "r", encoding="utf-8") as f:
-            payload = json.load(f)
-        if isinstance(payload, dict) and "rows" in payload:
-            df = pd.DataFrame(payload["rows"])
-        elif isinstance(payload, list):
-            df = pd.DataFrame(payload)
-        else:
-            raise ValueError("JSON input must be either a list of rows or an object with a 'rows' key")
-    else:
-        raise ValueError("Only CSV and JSON inputs are supported")
+    response = requests.get(base_url, headers=headers, params=params)
+    response.raise_for_status()
+    data = response.json()
 
-    # Filter by merchant_id if provided
-    if merchant_id:
-        # Check both "Merchant ID" (CSV header) and "merchant_id" (normalized)
-        id_col = next((col for col in df.columns if col.lower() in ["merchant id", "merchant_id"]), None)
-        if id_col:
-            df = df[df[id_col].astype(str) == str(merchant_id)]
+    if not data or "data" not in data:
+        return []
 
-    # Filter by date_range if provided (very basic implementation for now)
-    if date_range:
-        # Expected format: "January 2026" or "January 2026 to February 2026"
-        date_col = next((col for col in df.columns if col.lower() in ["date", "period_start"]), None)
-        if date_col:
-            if " to " in date_range:
-                start_label, end_label = date_range.split(" to ")
-                # Simple string matching for now as the CSV uses "Month Year"
-                # In a real app, we'd parse to datetime objects
-                df = df[df[date_col].str.contains(start_label) | df[date_col].str.contains(end_label)]
-            else:
-                df = df[df[date_col].str.contains(date_range)]
-
-    return df.to_dict(orient="records")
+    return data["data"]
 
 
 def normalize_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -76,31 +63,72 @@ def normalize_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             target_key = COLUMN_MAP.get(key, key)
             converted[target_key] = value
 
-        hits = float(converted["rto_api_hits"])
-        orders = float(converted["orders"])
-        cod_orders = float(converted["cod_orders"])
+        hits = float(converted.get("rto_api_hits", 0))
+        orders = float(converted.get("orders", 0))
+        cod_orders = float(converted.get("cod_orders", 0))
+        rto_orders = float(converted.get("rto_orders", 0))
+        cancelled_orders = float(converted.get("cancelled_orders", 0))
 
-        converted["cr_pct"] = round((orders / hits) * 100, 2) if hits else None
-        converted["cod_share_pct"] = round((cod_orders / orders) * 100, 2) if orders else None
-        converted["period_start"] = parse_month(converted["date"]).isoformat()
+        converted["cr_pct"] = round((orders / hits) * 100, 2) if hits else 0
+        converted["cod_share_pct"] = round((cod_orders / orders) * 100, 2) if orders else 0
+
+        # RTO% = RTO Orders / (Total Orders - Cancelled Orders)
+        denominator = orders - cancelled_orders
+        converted["rto_pct_overall"] = round((rto_orders / denominator) * 100, 2) if denominator > 0 else 0
+
+        # Extract month label for compatibility with existing summarization
+        dt = datetime.strptime(converted["date"], "%Y-%m-%d")
+        converted["date_label"] = dt.strftime(MONTH_FORMAT)
+        converted["period_start"] = dt.replace(day=1).date().isoformat()
+
         normalized.append(converted)
 
-    normalized.sort(key=lambda x: (x["period_start"], x["risk_flag"]))
+    normalized.sort(key=lambda x: (x["date"], x["risk_flag"]))
     return normalized
 
 
+def summarize_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    if not rows:
+        return {}
+
+    df = pd.DataFrame(rows)
+    # Group by the original month label we added
+    summary = df.groupby(["date_label", "risk_flag"]).agg({
+        "rto_api_hits": "sum",
+        "orders": "sum",
+        "cod_orders": "sum",
+        "rto_orders": "sum",
+        "delivered_orders": "sum",
+        "cancelled_orders": "sum"
+    }).reset_index()
+
+    # Recalculate percentages for the summary
+    summary["cr_pct"] = (summary["orders"] / summary["rto_api_hits"] * 100).round(2).fillna(0)
+    summary["cod_share_pct"] = (summary["cod_orders"] / summary["orders"] * 100).round(2).fillna(0)
+    denom = summary["orders"] - summary["cancelled_orders"]
+    summary["rto_pct_overall"] = (summary["rto_orders"] / denom * 100).round(2).where(denom > 0, 0)
+
+    return summary.to_dict(orient="records")
+
+
 def parse_month(label: str) -> date:
-    return datetime.strptime(label, MONTH_FORMAT).date().replace(day=1)
+    # Handle both YYYY-MM-DD and "Month Year" formats
+    try:
+        return datetime.strptime(label, "%Y-%m-%d").date().replace(day=1)
+    except ValueError:
+        return datetime.strptime(label, MONTH_FORMAT).date().replace(day=1)
 
 
 def build_maturity_metadata(rows: list[dict[str, Any]], analysis_today: str) -> dict[str, Any]:
+    if not rows:
+        return {"analysis_today": analysis_today}
+
     today = datetime.strptime(analysis_today, "%Y-%m-%d").date()
     latest_period = max(parse_month(row["date"]) for row in rows)
     latest_month_matches_today = latest_period.year == today.year and latest_period.month == today.month
 
     maturity_cutoff = today.replace(day=1)
     if today.day <= 15:
-        # If it's early in the month, even the immediately previous month can still be maturing for RTO.
         if today.month == 1:
             maturity_cutoff = maturity_cutoff.replace(year=today.year - 1, month=12)
         else:
@@ -113,9 +141,9 @@ def build_maturity_metadata(rows: list[dict[str, Any]], analysis_today: str) -> 
         "is_latest_period_partial": latest_month_matches_today,
         "rto_maturity_days": 15,
         "interpretation_notes": [
-            "Data is available till the previous day.",
+            "Data is fetched live from GoKwik Analytics API.",
             "RTO and COD RTO metrics mature after 15 days.",
-            "Do not over-interpret a recent drop in RTO unless fill rate and maturity support it.",
+            "Live data includes daily granularity summarized by risk flag.",
         ],
     }
 

@@ -11,15 +11,10 @@ An Model Context Protocol (MCP) server that provides tools for analyzing Return 
 
 ## Current Architecture
 
-Currently, the server operates on a **static file approach**:
-- Data is read from a CSV/JSON file defined in the `METRIC_ANALYSIS_INPUT_PATH`.
-- The [data_transforms.py](src/utils/data_transforms.py) utility handles filtering and normalization.
-
-### Roadmap: Future API Integration
-The architecture is designed to be modular. In the future:
-1.  The `GetMetricAnalysisDataTool` will be updated to make authenticated API calls to GoKwik's backend services.
-2.  The static CSV mock will be replaced with real-time data fetching.
-3.  Support for more granular timeframes (weekly/daily) will be added.
+The server connects directly to the **GoKwik Analytics API**:
+- **API Endpoint**: `https://prod-rto-dashboard-v4.gokwik.io/v1/shopify/rto/analytics`
+- **Data Grain**: Daily granularity, summarized by risk flag for analysis.
+- **Filtering**: Live filtering via `merchant-mid` and `merchant-int-id` headers.
 
 ## Installation
 
@@ -32,7 +27,7 @@ The architecture is designed to be modular. In the future:
 2.  **Set up Virtual Environment**:
     ```bash
     python -m venv .venv
-    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+    source .venv/bin/activate
     pip install -r requirements.txt
     ```
 
@@ -41,8 +36,8 @@ The architecture is designed to be modular. In the future:
     ```env
     GEMINI_API_KEY=your_api_key_here
     GEMINI_MODEL=gemini-2.0-flash
+    API_AUTH_TOKEN=rto$dash-board*prod
     ANALYSIS_TODAY=2026-03-24
-    METRIC_ANALYSIS_INPUT_PATH=sample_data/risk_flag_summary.csv
     MCP_SERVER_NAME=rto-kwikflows-mcp
     ```
 

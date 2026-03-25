@@ -17,7 +17,8 @@ settings = Settings.from_env()
 service = MetricAnalysisService(
     api_key=settings.gemini_api_key,
     model=settings.gemini_model,
-    input_path=settings.metric_analysis_input_path,
+    api_base_url=settings.api_base_url,
+    api_auth_token=settings.api_auth_token,
     analysis_today=settings.analysis_today,
 )
 
@@ -26,18 +27,18 @@ mcp = FastMCP(settings.mcp_server_name)
 
 @mcp.tool(
     name="get_metric_analysis_data",
-    description="Fetch monthly metric analysis data grouped by risk flag for a merchant. Use this when the user wants raw structured data before analysis. Requires merchant_id and optional date_range (e.g., 'January 2026' or 'January 2026 to February 2026').",
+    description="Fetch monthly metric analysis data grouped by risk flag for a merchant. Use this when the user wants raw structured data before analysis. Requires merchant_mid, merchant_int_id and optional date_range (e.g., 'January 2026' or 'January 2026 to February 2026').",
 )
-def get_metric_analysis_data(merchant_id: str, date_range: str | None = None) -> dict:
-    return service.get_metric_analysis_data(merchant_id=merchant_id, date_range=date_range)
+def get_metric_analysis_data(merchant_mid: str, merchant_int_id: int, date_range: str | None = None) -> dict:
+    return service.get_metric_analysis_data(merchant_mid=merchant_mid, merchant_int_id=merchant_int_id, date_range=date_range)
 
 
 @mcp.tool(
     name="analyze_monthly_risk_flag_metrics",
-    description="Analyze monthly risk-flag performance for a merchant using the question provided by the user. Requires merchant_id, question, and optional date_range.",
+    description="Analyze monthly risk-flag performance for a merchant using the question provided by the user. Requires merchant_mid, merchant_int_id, question, and optional date_range.",
 )
-def analyze_monthly_risk_flag_metrics(merchant_id: str, question: str, date_range: str | None = None) -> str:
-    result = service.analyze(merchant_id=merchant_id, question=question, date_range=date_range)
+def analyze_monthly_risk_flag_metrics(merchant_mid: str, merchant_int_id: int, question: str, date_range: str | None = None) -> str:
+    result = service.analyze(merchant_mid=merchant_mid, merchant_int_id=merchant_int_id, question=question, date_range=date_range)
     return result.answer
 
 

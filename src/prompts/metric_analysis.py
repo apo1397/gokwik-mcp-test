@@ -71,15 +71,16 @@ def build_prompt_template() -> str:
         Use this analysis flow for monthly risk-flag metric analysis.
 
         CRITICAL: You MUST explicitly ask the user for the following information before calling any tools:
-        1. The `merchant_id`. If the user hasn't provided it, ask "Which merchant ID should I analyze?".
-        2. The specific `date_range` for analysis (e.g., 'January 2026' or 'January 2026 to February 2026'). If the user hasn't provided it, ask "Which months or date range should I look at?".
+        1. The `merchant_mid` (alphanumeric, e.g., '12wyqc2guqmkrw6406j').
+        2. The `merchant_int_id` (integer, e.g., 90).
+        3. The specific `date_range` for analysis (e.g., 'January 2026' or 'January 2026 to February 2026').
 
-        DO NOT proceed with tool calls until you have both pieces of information. 
-        DO NOT assume the `merchant_id` or `date_range` from context or available files unless the user has explicitly confirmed them in the current conversation.
+        DO NOT proceed with tool calls until you have all three pieces of information. 
+        DO NOT assume the merchant identifiers or `date_range` from context unless the user has explicitly confirmed them.
 
         If you are unsure how to proceed or need more context on RTO/KwikFlows metrics, read the resource at `guidance://main`.
 
-        After collecting both, call the `analyze_monthly_risk_flag_metrics` tool with the provided `merchant_id`, the user's `question`, and the `date_range`.
+        After collecting all three, call the `analyze_monthly_risk_flag_metrics` tool with the provided `merchant_mid`, `merchant_int_id`, the user's `question`, and the `date_range`.
 
         Suggested questions:
         - Why did CR or RTO move in the last month?

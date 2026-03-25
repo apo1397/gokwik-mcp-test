@@ -9,30 +9,37 @@ from src.tools.get_metric_analysis_data import GetMetricAnalysisDataTool
 
 
 class MetricAnalysisService:
-    def __init__(self, *, api_key: str, model: str, input_path: str, analysis_today: str) -> None:
+    def __init__(self, *, api_key: str, model: str, api_base_url: str, api_auth_token: str, analysis_today: str) -> None:
         self._llm = build_chat_model(api_key=api_key, model=model)
         self._tool = GetMetricAnalysisDataTool()
-        self._input_path = input_path
+        self._api_base_url = api_base_url
+        self._api_auth_token = api_auth_token
         self._analysis_today = analysis_today
 
-    def get_metric_analysis_data(self, *, merchant_id: str, date_range: str | None = None) -> dict:
+    def get_metric_analysis_data(self, *, merchant_mid: str, merchant_int_id: int, date_range: str | None = None) -> dict:
         return self._tool.run(
-            merchant_id=merchant_id,
-            input_path=self._input_path,
+            merchant_mid=merchant_mid,
+            merchant_int_id=merchant_int_id,
+            api_base_url=self._api_base_url,
+            api_auth_token=self._api_auth_token,
             analysis_today=self._analysis_today,
             date_range=date_range,
         )
 
-    def analyze(self, *, merchant_id: str, question: str, date_range: str | None = None) -> AnalysisResult:
+    def analyze(self, *, merchant_mid: str, merchant_int_id: int, question: str, date_range: str | None = None) -> AnalysisResult:
         request = MetricAnalysisRequest(
-            merchant_id=merchant_id,
+            merchant_mid=merchant_mid,
+            merchant_int_id=merchant_int_id,
             question=question,
-            input_path=self._input_path,
             analysis_today=self._analysis_today,
             date_range=date_range,
         )
 
-        tool_payload = self.get_metric_analysis_data(merchant_id=merchant_id, date_range=date_range)
+        tool_payload = self.get_metric_analysis_data(
+            merchant_mid=merchant_mid,
+            merchant_int_id=merchant_int_id,
+            date_range=date_range
+        )
         prompt_messages = build_metric_analysis_messages(question, tool_payload)
         messages = [
             SystemMessage(content=prompt_messages[0][1]),

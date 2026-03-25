@@ -5,15 +5,16 @@ This resource provides additional context for the RTO (Return to Origin) and Kwi
 ## Core Requirements
 
 Before calling any tools, ensure you have:
-1.  **Merchant ID**: This is a unique identifier (e.g., `qwerty123`). If the user hasn't provided it, ask "Which merchant ID should I analyze?"
-2.  **Date Range**: The analysis works best on a monthly grain. Ask for specific months like "January 2026".
+1.  **Merchant MID**: This is an alphanumeric identifier (e.g., `12wyqc2guqmkrw6406j`). If missing, ask the user.
+2.  **Merchant Int ID**: This is an integer identifier (e.g., `90`). If missing, ask the user.
+3.  **Date Range**: The analysis works best on a monthly grain. Ask for specific months like "January 2026".
 
 ## Handling Missing Information
 
-If a user asks a general question like "How is my business doing?" without providing a merchant ID or date range:
--   **DO NOT** guess the merchant ID.
--   **DO NOT** assume the date range from the system date.
--   **DO** ask the user: "Could you please provide your Merchant ID and the month(s) you'd like me to analyze?"
+If a user asks a general question like "How is my business doing?" without providing both merchant IDs and a date range:
+-   **DO NOT** guess the merchant IDs.
+-   **DO NOT** proceed with only one ID.
+-   **DO** ask the user: "Could you please provide your Merchant MID, Merchant Integer ID, and the month(s) you'd like me to analyze?"
 
 ## Common Terms & Definitions
 
