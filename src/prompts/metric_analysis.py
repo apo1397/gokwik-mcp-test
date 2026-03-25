@@ -86,6 +86,8 @@ def build_prompt_template() -> str:
         - Why did CR or RTO move in the last month?
         - What is going well or poorly by risk flag?
         - Why does high-risk traffic look weak this month?
-        - Is low RTO genuinely good or just a data-quality effect?
+        - What KwikFlows rules are currently active for this merchant?
+        - Is there a specific KwikFlows action causing a drop in prepaid share?
+        - List all workflows and explain the priority of rules.
         """
     ).strip()

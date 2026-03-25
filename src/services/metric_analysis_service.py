@@ -8,12 +8,22 @@ from src.prompts.metric_analysis import build_metric_analysis_messages
 from src.tools.get_metric_analysis_data import GetMetricAnalysisDataTool
 
 
+from src.utils.data_transforms import (
+    fetch_api_data,
+    fetch_workflow_data,
+    normalize_rows,
+    summarize_rows,
+)
+
+
 class MetricAnalysisService:
-    def __init__(self, *, api_key: str, model: str, api_base_url: str, api_auth_token: str, analysis_today: str) -> None:
+    def __init__(self, *, api_key: str, model: str, api_base_url: str, api_auth_token: str, kwikflows_api_url: str, kwikflows_cookie: str, analysis_today: str) -> None:
         self._llm = build_chat_model(api_key=api_key, model=model)
         self._tool = GetMetricAnalysisDataTool()
         self._api_base_url = api_base_url
         self._api_auth_token = api_auth_token
+        self._kwikflows_api_url = kwikflows_api_url
+        self._kwikflows_cookie = kwikflows_cookie
         self._analysis_today = analysis_today
 
     def get_metric_analysis_data(self, *, merchant_mid: str, merchant_int_id: int, date_range: str | None = None) -> dict:
@@ -24,6 +34,13 @@ class MetricAnalysisService:
             api_auth_token=self._api_auth_token,
             analysis_today=self._analysis_today,
             date_range=date_range,
+        )
+
+    def get_workflows(self, *, merchant_mid: str) -> list[dict]:
+        return fetch_workflow_data(
+            api_url=self._kwikflows_api_url,
+            cookie=self._kwikflows_cookie,
+            merchant_mid=merchant_mid,
         )
 
     def analyze(self, *, merchant_mid: str, merchant_int_id: int, question: str, date_range: str | None = None) -> AnalysisResult:

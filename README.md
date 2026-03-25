@@ -11,10 +11,11 @@ An Model Context Protocol (MCP) server that provides tools for analyzing Return 
 
 ## Current Architecture
 
-The server connects directly to the **GoKwik Analytics API**:
-- **API Endpoint**: `https://prod-rto-dashboard-v4.gokwik.io/v1/shopify/rto/analytics`
-- **Data Grain**: Daily granularity, summarized by risk flag for analysis.
-- **Filtering**: Live filtering via `merchant-mid` and `merchant-int-id` headers.
+The server connects directly to the **GoKwik Analytics & KwikFlows APIs**:
+- **Metric Analytics**: `https://prod-rto-dashboard-v4.gokwik.io/v1/shopify/rto/analytics`
+- **KwikFlows Workflows**: `https://api.gokwik.co/v3/api/dashboard/kwikai/get-workflows`
+- **Data Grain**: Daily metrics and live workflow rule definitions.
+- **Filtering**: Real-time retrieval using `merchant-mid`, `merchant-int-id`, and session cookies.
 
 ## Installation
 

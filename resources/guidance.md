@@ -205,6 +205,14 @@ Analyze each risk segment (High, Medium, Low):
 
 ---
 
+## KwikFlows Workflow Analysis
+
+KwikFlows allows merchants to set up automated rules for order validation.
+- **Structure**: Workflows are made of rules. Each rule has **Conditions** (segment) and **Actions** (outcome).
+- **Priority**: Rules within a workflow are sorted by priority. The first rule whose conditions are met is executed.
+- **Serialization**: Requests pass through workflows in a serial priority. Only the action of the first breached condition is implemented.
+- **Array Truncation**: When listing workflows, arrays (like lists of pincodes) longer than 20 items are truncated to keep the context clean.
+
 ## Troubleshooting
 
 | Issue | Cause | Resolution |

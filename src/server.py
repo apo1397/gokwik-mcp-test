@@ -19,6 +19,8 @@ service = MetricAnalysisService(
     model=settings.gemini_model,
     api_base_url=settings.api_base_url,
     api_auth_token=settings.api_auth_token,
+    kwikflows_api_url=settings.kwikflows_api_url,
+    kwikflows_cookie=settings.kwikflows_cookie,
     analysis_today=settings.analysis_today,
 )
 
@@ -31,6 +33,14 @@ mcp = FastMCP(settings.mcp_server_name)
 )
 def get_metric_analysis_data(merchant_mid: str, merchant_int_id: int, date_range: str | None = None) -> dict:
     return service.get_metric_analysis_data(merchant_mid=merchant_mid, merchant_int_id=merchant_int_id, date_range=date_range)
+
+
+@mcp.tool(
+    name="list_kwikflows_workflows",
+    description="List all active and inactive KwikFlows workflows for a merchant to understand rules, conditions, and actions. Requires merchant_mid.",
+)
+def list_kwikflows_workflows(merchant_mid: str) -> list[dict]:
+    return service.get_workflows(merchant_mid=merchant_mid)
 
 
 @mcp.tool(

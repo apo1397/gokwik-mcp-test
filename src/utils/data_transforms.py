@@ -55,6 +55,69 @@ def fetch_api_data(
     return data["data"]
 
 
+def fetch_workflow_data(
+    api_url: str,
+    cookie: str,
+    merchant_mid: str,
+) -> list[dict[str, Any]]:
+    headers = {
+        "accept": "application/json, text/plain, */*",
+        "merchant-mid": merchant_mid,
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+    }
+    # Parse cookie string into a dict for requests
+    cookies = {}
+    if cookie:
+        for item in cookie.split("; "):
+            if "=" in item:
+                k, v = item.split("=", 1)
+                cookies[k] = v
+
+    params = {"mode": "live"}
+
+    response = requests.get(api_url, headers=headers, cookies=cookies, params=params)
+    response.raise_for_status()
+    data = response.json()
+
+    if not data or "data" not in data or "workflows" not in data["data"]:
+        return []
+
+    workflows = data["data"]["workflows"]
+    processed_workflows = []
+
+    for wf in workflows:
+        # Simplify structure for the agent
+        processed_wf = {
+            "workflow_id": wf.get("workflow_id"),
+            "workflow_name": wf.get("rule_name"),
+            "is_enabled": wf.get("is_enabled"),
+            "rules": []
+        }
+        
+        for rule in wf.get("rules", []):
+            raw_rule = rule.get("raw_data", {})
+            simplified_rule = {
+                "priority": raw_rule.get("priority"),
+                "conditions": [],
+                "actions": []
+            }
+            
+            # Truncate long arrays (> 20) in conditions
+            for cond in raw_rule.get("conditions", []):
+                simplified_cond = cond.copy()
+                if "values" in simplified_cond and isinstance(simplified_cond["values"], list):
+                    if len(simplified_cond["values"]) > 20:
+                        simplified_cond["values"] = simplified_cond["values"][:20] + ["... (truncated)"]
+                simplified_rule["conditions"].append(simplified_cond)
+            
+            simplified_rule["actions"] = raw_rule.get("actions", [])
+            processed_wf["rules"].append(simplified_rule)
+            
+        processed_workflows.append(processed_wf)
+
+    return processed_workflows
+
+
 def normalize_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     for row in rows:
