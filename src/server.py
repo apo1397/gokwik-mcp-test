@@ -42,14 +42,14 @@ def analyze_monthly_risk_flag_metrics(merchant_mid: str, merchant_int_id: int, q
     return result.answer
 
 
-@mcp.resource("guidance://main")
+@mcp.resource("resource://guidance/main")
 def get_guidance() -> str:
     """Provides troubleshooting and domain guidance for the RTO/KwikFlows analysis tools."""
     with open("resources/guidance.md", "r") as f:
         return f.read()
 
 
-@mcp.resource("business_context://main")
+@mcp.resource("resource://business_context/main")
 def get_business_context() -> str:
     """Provides business logic and benchmarks for GoKwik metrics."""
     with open("resources/business_context.md", "r") as f:

@@ -78,7 +78,7 @@ def build_prompt_template() -> str:
         DO NOT proceed with tool calls until you have all three pieces of information. 
         DO NOT assume the merchant identifiers or `date_range` from context unless the user has explicitly confirmed them.
 
-        Read `guidance://main` for troubleshooting and `business_context://main` for GoKwik-specific metric benchmarks.
+        Read `resource://guidance/main` for troubleshooting and `resource://business_context/main` for GoKwik-specific metric benchmarks.
 
         After collecting all three, call the `analyze_monthly_risk_flag_metrics` tool with the provided `merchant_mid`, `merchant_int_id`, the user's `question`, and the `date_range`.
 
