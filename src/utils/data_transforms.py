@@ -57,25 +57,19 @@ def fetch_api_data(
 
 def fetch_workflow_data(
     api_url: str,
-    cookie: str,
+    auth_token: str,
     merchant_mid: str,
+    merchant_int_id: int,
 ) -> list[dict[str, Any]]:
     headers = {
-        "accept": "application/json, text/plain, */*",
+        "Authorization": auth_token,
         "merchant-mid": merchant_mid,
-        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+        "merchant-int-id": str(merchant_int_id),
+        "user-type": "admin",
     }
-    # Parse cookie string into a dict for requests
-    cookies = {}
-    if cookie:
-        for item in cookie.split("; "):
-            if "=" in item:
-                k, v = item.split("=", 1)
-                cookies[k] = v
+    params = {"merchant_id": merchant_mid}
 
-    params = {"mode": "live"}
-
-    response = requests.get(api_url, headers=headers, cookies=cookies, params=params)
+    response = requests.get(api_url, headers=headers, params=params)
     response.raise_for_status()
     data = response.json()
 
@@ -116,6 +110,149 @@ def fetch_workflow_data(
         processed_workflows.append(processed_wf)
 
     return processed_workflows
+
+
+def build_kwikflows_analysis_payload(
+    api_url: str,
+    auth_token: str,
+    merchant_mid: str,
+    merchant_int_id: int,
+) -> dict[str, Any]:
+    """Fetch workflows, filter to active only, and structure for LLM analysis."""
+    headers = {
+        "Authorization": auth_token,
+        "merchant-mid": merchant_mid,
+        "merchant-int-id": str(merchant_int_id),
+        "user-type": "admin",
+    }
+    params = {"merchant_id": merchant_mid}
+
+    response = requests.get(api_url, headers=headers, params=params)
+    response.raise_for_status()
+    data = response.json()
+
+    if not data or "data" not in data or "workflows" not in data["data"]:
+        return {
+            "merchant_mid": merchant_mid,
+            "merchant_int_id": merchant_int_id,
+            "total_workflows": 0,
+            "active_workflows": 0,
+            "workflows": [],
+        }
+
+    all_workflows = data["data"]["workflows"]
+    active_workflows = [wf for wf in all_workflows if wf.get("is_enabled")]
+
+    processed = []
+    for wf in active_workflows:
+        processed_wf = {
+            "workflow_name": wf.get("rule_name"),
+            "workflow_id": wf.get("workflow_id"),
+            "workflow_flag": wf.get("workflow_flag"),
+            "is_ab_test_enabled": wf.get("is_ab_test_enabled", False),
+            "ab_control_intervention": wf.get("ab_control_intervention"),
+            "created_at": wf.get("created_at"),
+            "updated_at": wf.get("updated_at"),
+            "rules": [],
+        }
+
+        for rule in wf.get("rules", []):
+            raw = rule.get("raw_data", {})
+            simplified_rule: dict[str, Any] = {
+                "priority": raw.get("priority"),
+                "conditions": [],
+                "actions": [],
+            }
+
+            for cond in raw.get("conditions", []):
+                simplified_cond = _simplify_condition(cond)
+                simplified_rule["conditions"].append(simplified_cond)
+
+            for action in raw.get("actions", []):
+                simplified_action = _simplify_action(action)
+                simplified_rule["actions"].append(simplified_action)
+
+            processed_wf["rules"].append(simplified_rule)
+
+        processed.append(processed_wf)
+
+    return {
+        "merchant_mid": merchant_mid,
+        "merchant_int_id": merchant_int_id,
+        "total_workflows": len(all_workflows),
+        "active_workflows": len(active_workflows),
+        "inactive_workflows": len(all_workflows) - len(active_workflows),
+        "workflows": processed,
+    }
+
+
+def _simplify_condition(cond: dict[str, Any]) -> dict[str, Any]:
+    """Simplify a condition for LLM consumption, truncating large arrays."""
+    result: dict[str, Any] = {
+        "key": cond.get("key"),
+        "operator": cond.get("operator"),
+        "workflow_type": cond.get("workflow_type"),
+    }
+
+    # Include scalar value if present
+    if "value" in cond:
+        result["value"] = cond["value"]
+
+    # Truncate large value arrays
+    if "values" in cond and isinstance(cond["values"], list):
+        vals = cond["values"]
+        if len(vals) > 20:
+            result["values"] = vals[:20] + [f"... ({len(vals) - 20} more, {len(vals)} total)"]
+        else:
+            result["values"] = vals
+
+    # Include selected_products for SKU conditions (human-readable names)
+    if "selected_products" in cond and cond["selected_products"]:
+        products = cond["selected_products"]
+        simplified_products = []
+        for p in products[:10]:  # Cap at 10 products
+            simplified_products.append({
+                "product_name": p.get("product_name"),
+                "variants": [
+                    v.get("variant_name") for v in p.get("variant_ids", [])
+                ],
+            })
+        if len(products) > 10:
+            simplified_products.append(f"... ({len(products) - 10} more products)")
+        result["selected_products"] = simplified_products
+
+    # Include file_name if present (pincode lists etc.)
+    if "file_name" in cond:
+        result["file_name"] = cond["file_name"]
+
+    return result
+
+
+def _simplify_action(action: dict[str, Any]) -> dict[str, Any]:
+    """Simplify an action for LLM consumption, keeping key config values."""
+    result: dict[str, Any] = {"action": action.get("action")}
+
+    if "ppcod_config" in action:
+        result["ppcod_config"] = action["ppcod_config"]
+
+    if "cod_fees" in action:
+        result["cod_fees"] = action["cod_fees"]
+
+    if "cod_confirmation_prompt_configs" in action:
+        cfg = action["cod_confirmation_prompt_configs"]
+        result["cod_prompt_config"] = {
+            "enabled": cfg.get("enable"),
+            "navigates_to": cfg.get("navigateTo"),
+        }
+
+    if "upi_discount" in action:
+        result["upi_discount_pct"] = action["upi_discount"]
+        result["upi_discount_cap"] = action.get("discount_upto")
+
+    if "payment_configs" in action:
+        result["has_payment_ui_config"] = True
+
+    return result
 
 
 def normalize_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
