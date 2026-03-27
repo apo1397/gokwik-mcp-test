@@ -37,10 +37,10 @@ def get_metric_analysis_data(merchant_mid: str, merchant_int_id: int, date_range
 
 @mcp.tool(
     name="list_kwikflows_workflows",
-    description="List all active and inactive KwikFlows workflows for a merchant to understand rules, conditions, and actions. Requires merchant_mid.",
+    description="List all active and inactive KwikFlows workflows for a merchant to understand rules, conditions, and actions. Requires merchant_mid and merchant_int_id.",
 )
-def list_kwikflows_workflows(merchant_mid: str) -> list[dict]:
-    return service.get_workflows(merchant_mid=merchant_mid)
+def list_kwikflows_workflows(merchant_mid: str, merchant_int_id: int) -> list[dict]:
+    return service.get_workflows(merchant_mid=merchant_mid, merchant_int_id=merchant_int_id)
 
 
 @mcp.tool(

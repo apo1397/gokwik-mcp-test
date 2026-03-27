@@ -57,25 +57,19 @@ def fetch_api_data(
 
 def fetch_workflow_data(
     api_url: str,
-    cookie: str,
+    auth_token: str,
     merchant_mid: str,
+    merchant_int_id: int,
 ) -> list[dict[str, Any]]:
     headers = {
-        "accept": "application/json, text/plain, */*",
+        "Authorization": auth_token,
         "merchant-mid": merchant_mid,
-        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+        "merchant-int-id": str(merchant_int_id),
+        "user-type": "admin",
     }
-    # Parse cookie string into a dict for requests
-    cookies = {}
-    if cookie:
-        for item in cookie.split("; "):
-            if "=" in item:
-                k, v = item.split("=", 1)
-                cookies[k] = v
+    params = {"merchant_id": merchant_mid}
 
-    params = {"mode": "live"}
-
-    response = requests.get(api_url, headers=headers, cookies=cookies, params=params)
+    response = requests.get(api_url, headers=headers, params=params)
     response.raise_for_status()
     data = response.json()
 

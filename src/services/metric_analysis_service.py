@@ -36,11 +36,12 @@ class MetricAnalysisService:
             date_range=date_range,
         )
 
-    def get_workflows(self, *, merchant_mid: str) -> list[dict]:
+    def get_workflows(self, *, merchant_mid: str, merchant_int_id: int) -> list[dict]:
         return fetch_workflow_data(
             api_url=self._kwikflows_api_url,
-            cookie=self._kwikflows_cookie,
+            auth_token=self._api_auth_token,
             merchant_mid=merchant_mid,
+            merchant_int_id=merchant_int_id,
         )
 
     def analyze(self, *, merchant_mid: str, merchant_int_id: int, question: str, date_range: str | None = None) -> AnalysisResult:
