@@ -74,116 +74,30 @@ def fetch_workflow_data(
     response.raise_for_status()
     data = response.json()
 
-    # Handle empty or missing data
-    if not data:
+    if not data or "data" not in data:
         return []
 
-    # Extract workflows from the response structure
-    # New API returns: { statusCode, message, data: { workflows: [...] } }
-    workflows = []
-
-    if isinstance(data, dict):
-        # Handle new API format: data.data.workflows
-        if "data" in data and isinstance(data["data"], dict):
-            workflows_list = data["data"].get("workflows", [])
-        # Handle direct workflows in response
-        elif "workflows" in data:
-            workflows_list = data.get("workflows", [])
-        # Handle rules directly
-        elif "rules" in data:
-            workflows_list = data.get("rules", [])
-        else:
-            workflows_list = []
-
-        # Process workflows with nested rules
-        for wf in workflows_list:
-            # Check if this is a workflow with nested rules structure
-            if "rules" in wf:
-                # Each rule in the workflow should be processed
-                for rule in wf.get("rules", []):
-                    raw_data = rule.get("raw_data", {})
-                    workflow = {
-                        "workflow_id": wf.get("workflow_id"),
-                        "workflow_name": wf.get("rule_name"),
-                        "rule_id": rule.get("rule_id"),
-                        "is_enabled": wf.get("is_enabled", True),
-                        "priority": raw_data.get("priority"),
-                        "conditions": raw_data.get("conditions", []),
-                        "actions": raw_data.get("actions", []),
-                        "type": wf.get("type"),
-                        "workflow_flag": wf.get("workflow_flag"),
-                    }
-                    workflows.append(workflow)
-            else:
-                # Standalone rule/workflow
-                workflow = {
-                    "rule_id": wf.get("id") or wf.get("rule_id"),
-                    "rule_name": wf.get("name") or wf.get("rule_name"),
-                    "is_enabled": wf.get("enabled", wf.get("is_enabled", True)),
-                    "priority": wf.get("priority"),
-                    "conditions": wf.get("conditions", []),
-                    "actions": wf.get("actions", []),
-                }
-                workflows.append(workflow)
-    elif isinstance(data, list):
-        # If data is a list of workflows directly
-        for wf in data:
-            if "rules" in wf:
-                for rule in wf.get("rules", []):
-                    raw_data = rule.get("raw_data", {})
-                    workflow = {
-                        "workflow_id": wf.get("workflow_id"),
-                        "workflow_name": wf.get("rule_name"),
-                        "rule_id": rule.get("rule_id"),
-                        "is_enabled": wf.get("is_enabled", True),
-                        "priority": raw_data.get("priority"),
-                        "conditions": raw_data.get("conditions", []),
-                        "actions": raw_data.get("actions", []),
-                        "type": wf.get("type"),
-                        "workflow_flag": wf.get("workflow_flag"),
-                    }
-                    workflows.append(workflow)
-            else:
-                workflow = {
-                    "rule_id": wf.get("id") or wf.get("rule_id"),
-                    "rule_name": wf.get("name") or wf.get("rule_name"),
-                    "is_enabled": wf.get("enabled", wf.get("is_enabled", True)),
-                    "priority": wf.get("priority"),
-                    "conditions": wf.get("conditions", []),
-                    "actions": wf.get("actions", []),
-                }
-                workflows.append(workflow)
-
-    def truncate_large_arrays(obj: Any, max_length: int = 20) -> Any:
-        """Recursively truncate arrays with length > max_length."""
-        if isinstance(obj, dict):
-            return {k: truncate_large_arrays(v, max_length) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            if len(obj) > max_length:
-                # Keep first max_length items and add truncation indicator
-                truncated = obj[:max_length]
-                truncated.append(f"... ({len(obj) - max_length} more items)")
-                return truncated
-            return [truncate_large_arrays(item, max_length) for item in obj]
-        else:
-            return obj
-
-    # Process workflows to simplify structure for agent consumption
+    workflows_list = data["data"].get("workflows", [])
     processed_workflows = []
-    for wf in workflows:
-        processed_wf = {
+
+    for wf in workflows_list:
+        rules = []
+        for rule in wf.get("rules", []):
+            raw = rule.get("raw_data", {})
+            rules.append({
+                "priority": raw.get("priority"),
+                "conditions": raw.get("conditions", []),
+                "actions": raw.get("actions", []),
+            })
+
+        processed_workflows.append({
             "workflow_id": wf.get("workflow_id"),
-            "workflow_name": wf.get("workflow_name"),
-            "rule_id": wf.get("rule_id"),
+            "workflow_name": wf.get("rule_name"),
             "is_enabled": wf.get("is_enabled"),
-            "priority": wf.get("priority"),
             "type": wf.get("type"),
             "workflow_flag": wf.get("workflow_flag"),
-            "conditions": truncate_large_arrays(wf.get("conditions", [])),
-            "actions": truncate_large_arrays(wf.get("actions", []))
-        }
-
-        processed_workflows.append(processed_wf)
+            "rules": rules,
+        })
 
     return processed_workflows
 
