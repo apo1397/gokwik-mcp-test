@@ -19,22 +19,15 @@ class GetMetricAnalysisDataTool(Tool):
         *,
         merchant_mid: str,
         merchant_int_id: int,
-        api_base_url: str,
         api_auth_token: str,
         analysis_today: str,
         date_range: str | None = None,
         **_: Any
     ) -> dict[str, Any]:
-        # Simple date parsing from date_range if provided
         from_date = "2026-01-01"
         to_date = analysis_today
-        
-        if date_range and " to " in date_range:
-            # Add basic date parsing logic here if needed
-            pass
 
         raw_rows = fetch_api_data(
-            base_url=api_base_url,
             auth_token=api_auth_token,
             merchant_mid=merchant_mid,
             merchant_int_id=merchant_int_id,

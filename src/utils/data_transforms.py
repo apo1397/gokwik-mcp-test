@@ -11,6 +11,9 @@ import requests
 
 MONTH_FORMAT = "%B %Y"
 
+RTO_API_URL = "https://prod-rto-dashboard-v4.gokwik.io/v1/shopify/rto/analytics"
+KWIKFLOWS_API_URL = "https://prod-rto-dashboard-v4.gokwik.io/v1/kwikai/workflow/rules"
+
 
 COLUMN_MAP = {
     "date": "date",
@@ -25,7 +28,6 @@ COLUMN_MAP = {
 
 
 def fetch_api_data(
-    base_url: str,
     auth_token: str,
     merchant_mid: str,
     merchant_int_id: int,
@@ -45,7 +47,7 @@ def fetch_api_data(
         "to_date": to_date,
     }
 
-    response = requests.get(base_url, headers=headers, params=params)
+    response = requests.get(RTO_API_URL, headers=headers, params=params)
     response.raise_for_status()
     data = response.json()
 
@@ -56,7 +58,6 @@ def fetch_api_data(
 
 
 def fetch_workflow_data(
-    api_url: str,
     auth_token: str,
     merchant_mid: str,
     merchant_int_id: int,
@@ -69,51 +70,125 @@ def fetch_workflow_data(
     }
     params = {"merchant_id": merchant_mid}
 
-    response = requests.get(api_url, headers=headers, params=params)
+    response = requests.get(KWIKFLOWS_API_URL, headers=headers, params=params)
     response.raise_for_status()
     data = response.json()
 
-    if not data or "data" not in data or "workflows" not in data["data"]:
+    # Handle empty or missing data
+    if not data:
         return []
 
-    workflows = data["data"]["workflows"]
-    processed_workflows = []
+    # Extract workflows from the response structure
+    # New API returns: { statusCode, message, data: { workflows: [...] } }
+    workflows = []
 
+    if isinstance(data, dict):
+        # Handle new API format: data.data.workflows
+        if "data" in data and isinstance(data["data"], dict):
+            workflows_list = data["data"].get("workflows", [])
+        # Handle direct workflows in response
+        elif "workflows" in data:
+            workflows_list = data.get("workflows", [])
+        # Handle rules directly
+        elif "rules" in data:
+            workflows_list = data.get("rules", [])
+        else:
+            workflows_list = []
+
+        # Process workflows with nested rules
+        for wf in workflows_list:
+            # Check if this is a workflow with nested rules structure
+            if "rules" in wf:
+                # Each rule in the workflow should be processed
+                for rule in wf.get("rules", []):
+                    raw_data = rule.get("raw_data", {})
+                    workflow = {
+                        "workflow_id": wf.get("workflow_id"),
+                        "workflow_name": wf.get("rule_name"),
+                        "rule_id": rule.get("rule_id"),
+                        "is_enabled": wf.get("is_enabled", True),
+                        "priority": raw_data.get("priority"),
+                        "conditions": raw_data.get("conditions", []),
+                        "actions": raw_data.get("actions", []),
+                        "type": wf.get("type"),
+                        "workflow_flag": wf.get("workflow_flag"),
+                    }
+                    workflows.append(workflow)
+            else:
+                # Standalone rule/workflow
+                workflow = {
+                    "rule_id": wf.get("id") or wf.get("rule_id"),
+                    "rule_name": wf.get("name") or wf.get("rule_name"),
+                    "is_enabled": wf.get("enabled", wf.get("is_enabled", True)),
+                    "priority": wf.get("priority"),
+                    "conditions": wf.get("conditions", []),
+                    "actions": wf.get("actions", []),
+                }
+                workflows.append(workflow)
+    elif isinstance(data, list):
+        # If data is a list of workflows directly
+        for wf in data:
+            if "rules" in wf:
+                for rule in wf.get("rules", []):
+                    raw_data = rule.get("raw_data", {})
+                    workflow = {
+                        "workflow_id": wf.get("workflow_id"),
+                        "workflow_name": wf.get("rule_name"),
+                        "rule_id": rule.get("rule_id"),
+                        "is_enabled": wf.get("is_enabled", True),
+                        "priority": raw_data.get("priority"),
+                        "conditions": raw_data.get("conditions", []),
+                        "actions": raw_data.get("actions", []),
+                        "type": wf.get("type"),
+                        "workflow_flag": wf.get("workflow_flag"),
+                    }
+                    workflows.append(workflow)
+            else:
+                workflow = {
+                    "rule_id": wf.get("id") or wf.get("rule_id"),
+                    "rule_name": wf.get("name") or wf.get("rule_name"),
+                    "is_enabled": wf.get("enabled", wf.get("is_enabled", True)),
+                    "priority": wf.get("priority"),
+                    "conditions": wf.get("conditions", []),
+                    "actions": wf.get("actions", []),
+                }
+                workflows.append(workflow)
+
+    def truncate_large_arrays(obj: Any, max_length: int = 20) -> Any:
+        """Recursively truncate arrays with length > max_length."""
+        if isinstance(obj, dict):
+            return {k: truncate_large_arrays(v, max_length) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            if len(obj) > max_length:
+                # Keep first max_length items and add truncation indicator
+                truncated = obj[:max_length]
+                truncated.append(f"... ({len(obj) - max_length} more items)")
+                return truncated
+            return [truncate_large_arrays(item, max_length) for item in obj]
+        else:
+            return obj
+
+    # Process workflows to simplify structure for agent consumption
+    processed_workflows = []
     for wf in workflows:
-        # Simplify structure for the agent
         processed_wf = {
             "workflow_id": wf.get("workflow_id"),
-            "workflow_name": wf.get("rule_name"),
+            "workflow_name": wf.get("workflow_name"),
+            "rule_id": wf.get("rule_id"),
             "is_enabled": wf.get("is_enabled"),
-            "rules": []
+            "priority": wf.get("priority"),
+            "type": wf.get("type"),
+            "workflow_flag": wf.get("workflow_flag"),
+            "conditions": truncate_large_arrays(wf.get("conditions", [])),
+            "actions": truncate_large_arrays(wf.get("actions", []))
         }
-        
-        for rule in wf.get("rules", []):
-            raw_rule = rule.get("raw_data", {})
-            simplified_rule = {
-                "priority": raw_rule.get("priority"),
-                "conditions": [],
-                "actions": []
-            }
-            
-            # Truncate long arrays (> 20) in conditions
-            for cond in raw_rule.get("conditions", []):
-                simplified_cond = cond.copy()
-                if "values" in simplified_cond and isinstance(simplified_cond["values"], list):
-                    if len(simplified_cond["values"]) > 20:
-                        simplified_cond["values"] = simplified_cond["values"][:20] + ["... (truncated)"]
-                simplified_rule["conditions"].append(simplified_cond)
-            
-            simplified_rule["actions"] = raw_rule.get("actions", [])
-            processed_wf["rules"].append(simplified_rule)
-            
+
         processed_workflows.append(processed_wf)
 
     return processed_workflows
 
 
 def build_kwikflows_analysis_payload(
-    api_url: str,
     auth_token: str,
     merchant_mid: str,
     merchant_int_id: int,
@@ -127,7 +202,7 @@ def build_kwikflows_analysis_payload(
     }
     params = {"merchant_id": merchant_mid}
 
-    response = requests.get(api_url, headers=headers, params=params)
+    response = requests.get(KWIKFLOWS_API_URL, headers=headers, params=params)
     response.raise_for_status()
     data = response.json()
 

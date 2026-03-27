@@ -17,10 +17,7 @@ settings = Settings.from_env()
 service = MetricAnalysisService(
     api_key=settings.gemini_api_key,
     model=settings.gemini_model,
-    api_base_url=settings.api_base_url,
     api_auth_token=settings.api_auth_token,
-    kwikflows_api_url=settings.kwikflows_api_url,
-    kwikflows_cookie=settings.kwikflows_cookie,
     analysis_today=settings.analysis_today,
 )
 

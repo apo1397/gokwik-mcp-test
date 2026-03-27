@@ -4,7 +4,12 @@
     "brainstorming": {
       "source": "smithery.ai",
       "sourceType": "well-known",
-      "computedHash": "efddfd0efbd0e7b5075c5a66ff91a706ac506c88c7b5ddd7fd45a351cb3fe3af"
+      "computedHash": "8df9b47092524833138b58682d03f2e153a242e550d1693657afdbee0cc9cdb0"
+    },
+    "chrome-devtools": {
+      "source": "smithery.ai",
+      "sourceType": "well-known",
+      "computedHash": "85d9c4ef94e00ddfc937d50aab72a307e80b98bc7e6744ec6e239ef68819c2d7"
     },
     "prd": {
       "source": "smithery.ai",
