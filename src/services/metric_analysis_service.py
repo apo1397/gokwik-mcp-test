@@ -3,12 +3,14 @@ from __future__ import annotations
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from src.clients.gemini_client import build_chat_model
-from src.models.schemas import AnalysisResult, MetricAnalysisRequest
+from src.models.schemas import AnalysisResult, KwikflowsAnalysisRequest, KwikflowsAnalysisResult, MetricAnalysisRequest
+from src.prompts.kwikflows_analysis import build_kwikflows_analysis_messages
 from src.prompts.metric_analysis import build_metric_analysis_messages
 from src.tools.get_metric_analysis_data import GetMetricAnalysisDataTool
 
 
 from src.utils.data_transforms import (
+    build_kwikflows_analysis_payload,
     fetch_api_data,
     fetch_workflow_data,
     normalize_rows,
@@ -42,6 +44,34 @@ class MetricAnalysisService:
             auth_token=self._api_auth_token,
             merchant_mid=merchant_mid,
             merchant_int_id=merchant_int_id,
+        )
+
+    def analyze_kwikflows(self, *, merchant_mid: str, merchant_int_id: int, question: str) -> KwikflowsAnalysisResult:
+        request = KwikflowsAnalysisRequest(
+            merchant_mid=merchant_mid,
+            merchant_int_id=merchant_int_id,
+            question=question,
+        )
+
+        workflows_payload = build_kwikflows_analysis_payload(
+            api_url=self._kwikflows_api_url,
+            auth_token=self._api_auth_token,
+            merchant_mid=merchant_mid,
+            merchant_int_id=merchant_int_id,
+        )
+
+        prompt_messages = build_kwikflows_analysis_messages(question, workflows_payload)
+        messages = [
+            SystemMessage(content=prompt_messages[0][1]),
+            HumanMessage(content=prompt_messages[1][1]),
+        ]
+        response = self._llm.invoke(messages)
+        answer = response.content if isinstance(response.content, str) else str(response.content)
+
+        return KwikflowsAnalysisResult(
+            request=request,
+            workflows_payload=workflows_payload,
+            answer=answer,
         )
 
     def analyze(self, *, merchant_mid: str, merchant_int_id: int, question: str, date_range: str | None = None) -> AnalysisResult:

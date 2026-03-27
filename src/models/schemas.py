@@ -23,3 +23,15 @@ class AnalysisResult(BaseModel):
     request: MetricAnalysisRequest
     tool_payload: dict[str, Any]
     answer: str
+
+
+class KwikflowsAnalysisRequest(BaseModel):
+    merchant_mid: str = Field(..., description="Merchant alphanumeric identifier (merchant-mid)")
+    merchant_int_id: int = Field(..., description="Merchant integer identifier (merchant-int-id)")
+    question: str = Field(..., description="The user's natural-language analysis question about KwikFlows")
+
+
+class KwikflowsAnalysisResult(BaseModel):
+    request: KwikflowsAnalysisRequest
+    workflows_payload: dict[str, Any]
+    answer: str
