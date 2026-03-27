@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
+
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 
 
-def build_chat_model(*, api_key: str, model: str) -> ChatGoogleGenerativeAI:
-    return ChatGoogleGenerativeAI(
+def build_chat_model(*, api_key: str, model: str) -> ChatOpenAI:
+    return ChatOpenAI(
         model=model,
-        google_api_key=api_key,
-        temperature=0,
+        api_key=api_key,
+        base_url=NVIDIA_BASE_URL,
+        temperature=1,
+        top_p=0.95,
+        max_tokens=8192,
     )
