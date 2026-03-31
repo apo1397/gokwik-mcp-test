@@ -15,10 +15,12 @@ from src.services.metric_analysis_service import MetricAnalysisService
 
 settings = Settings.from_env()
 service = MetricAnalysisService(
-    api_key=settings.gemini_api_key,
-    model=settings.gemini_model,
+    api_key=settings.llm_api_key,
+    model=settings.llm_model,
+    api_base_url=settings.api_base_url,
     api_auth_token=settings.api_auth_token,
-    analysis_today=settings.analysis_today,
+    kwikflows_api_url=settings.kwikflows_api_url,
+    kwikflows_impact_api_url=settings.kwikflows_impact_api_url,
 )
 
 mcp = FastMCP(settings.mcp_server_name)
@@ -26,10 +28,10 @@ mcp = FastMCP(settings.mcp_server_name)
 
 @mcp.tool(
     name="get_metric_analysis_data",
-    description="Fetch monthly metric analysis data grouped by risk flag for a merchant. Use this when the user wants raw structured data before analysis. Requires merchant_mid, merchant_int_id and optional date_range (e.g., 'January 2026' or 'January 2026 to February 2026').",
+    description="Fetch metric analysis data grouped by risk flag for a merchant. Data is aggregated to monthly by default. Requires merchant_mid, merchant_int_id. Optional: date_range (e.g., 'January 2026 to February 2026'), grain ('day', 'week', or 'month' — only override if user explicitly asks for a specific granularity).",
 )
-def get_metric_analysis_data(merchant_mid: str, merchant_int_id: int, date_range: str | None = None) -> dict:
-    return service.get_metric_analysis_data(merchant_mid=merchant_mid, merchant_int_id=merchant_int_id, date_range=date_range)
+def get_metric_analysis_data(merchant_mid: str, merchant_int_id: int, date_range: str | None = None, grain: str | None = None) -> dict:
+    return service.get_metric_analysis_data(merchant_mid=merchant_mid, merchant_int_id=merchant_int_id, date_range=date_range, grain=grain)
 
 
 @mcp.tool(
@@ -51,10 +53,19 @@ def analyze_kwikflows(merchant_mid: str, merchant_int_id: int, question: str) ->
 
 @mcp.tool(
     name="analyze_monthly_risk_flag_metrics",
-    description="Analyze monthly risk-flag performance for a merchant using the question provided by the user. Requires merchant_mid, merchant_int_id, question, and optional date_range.",
+    description="Analyze risk-flag performance for a merchant using the question provided by the user. Data is aggregated to monthly by default. Requires merchant_mid, merchant_int_id, question. Optional: date_range, grain ('day', 'week', or 'month').",
 )
-def analyze_monthly_risk_flag_metrics(merchant_mid: str, merchant_int_id: int, question: str, date_range: str | None = None) -> str:
-    result = service.analyze(merchant_mid=merchant_mid, merchant_int_id=merchant_int_id, question=question, date_range=date_range)
+def analyze_monthly_risk_flag_metrics(merchant_mid: str, merchant_int_id: int, question: str, date_range: str | None = None, grain: str | None = None) -> str:
+    result = service.analyze(merchant_mid=merchant_mid, merchant_int_id=merchant_int_id, question=question, date_range=date_range, grain=grain)
+    return result.answer
+
+
+@mcp.tool(
+    name="analyze_kwikflow_impact",
+    description="Analyze the impact of a specific KwikFlow rule for a merchant. First use list_kwikflows_workflows to get the rule_id, then call this tool. Does NOT work for AB experiment workflows. Requires merchant_mid, merchant_int_id, rule_id, and a question.",
+)
+def analyze_kwikflow_impact(merchant_mid: str, merchant_int_id: int, rule_id: str, question: str) -> str:
+    result = service.analyze_kwikflow_impact(merchant_mid=merchant_mid, merchant_int_id=merchant_int_id, rule_id=rule_id, question=question)
     return result.answer
 
 
