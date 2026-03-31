@@ -1,12 +1,11 @@
 """
-Test script for the metric analysis tool and LLM integration.
+Test script for the MCP server data tools.
 
 Usage:
     python tests/test_metric_analysis.py
 
 Requires:
-    - LLM_API_KEY (or GEMINI_API_KEY) in .env or environment
-    - Network access to GoKwik APIs and LLM provider
+    - Network access to GoKwik APIs
 """
 
 import json
@@ -22,18 +21,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from src.clients.gemini_client import build_chat_model
 from src.config import Settings
-from src.prompts.metric_analysis import build_metric_analysis_messages
-from src.tools.get_metric_analysis_data import GetMetricAnalysisDataTool, _parse_date_range
-from langchain_core.messages import HumanMessage, SystemMessage
+from src.services.metric_analysis_service import MetricAnalysisService
+from src.tools.get_metric_analysis_data import _parse_date_range
 
 
 # ── Test inputs ──────────────────────────────────────────────────────────────
 MERCHANT_MID = "19g6ilyznza4p"
 MERCHANT_INT_ID = 5107
 DATE_RANGE = "January 2026 to March 2026"
-QUESTION = "What is the hits contribution (percentage) and orders contribution (percentage) for High Risk segment across January, February, and March 2026?"
 
 
 def test_date_parsing():
@@ -56,22 +52,15 @@ def test_date_parsing():
     print()
 
 
-def test_data_fetch():
+def test_metric_data_fetch(service: MetricAnalysisService):
     print("=" * 60)
-    print("2. API DATA FETCH + AGGREGATION")
+    print("2. METRIC DATA FETCH + AGGREGATION")
     print("=" * 60)
-
-    settings = Settings.from_env()
-    tool = GetMetricAnalysisDataTool()
-    analysis_today = date.today().isoformat()
 
     start = time.time()
-    result = tool.run(
+    result = service.get_metric_analysis_data(
         merchant_mid=MERCHANT_MID,
         merchant_int_id=MERCHANT_INT_ID,
-        api_base_url=settings.api_base_url,
-        api_auth_token=settings.api_auth_token,
-        analysis_today=analysis_today,
         date_range=DATE_RANGE,
     )
     elapsed = time.time() - start
@@ -88,66 +77,88 @@ def test_data_fetch():
         print(f"    {row['period_label']:>20s} | {row['risk_flag']:>12s} | hits={row['rto_api_hits']:>8,} | orders={row['orders']:>6,} | CR={row['cr_pct']}% | COD={row['cod_share_pct']}% | RTO={row['rto_pct_overall']}%")
     print()
 
-    return result
 
-
-def test_prompt_build(tool_payload: dict):
+def test_kwikflows_analysis_data(service: MetricAnalysisService):
     print("=" * 60)
-    print("3. PROMPT CONSTRUCTION")
+    print("3. KWIKFLOWS ANALYSIS DATA")
     print("=" * 60)
-
-    messages = build_metric_analysis_messages(QUESTION, tool_payload)
-    print(f"  System prompt: {len(messages[0][1]):,} chars")
-    print(f"  Human prompt:  {len(messages[1][1]):,} chars")
-    print(f"  Total:         {len(messages[0][1]) + len(messages[1][1]):,} chars")
-    print()
-    return messages
-
-
-def test_llm_call(prompt_messages: list):
-    print("=" * 60)
-    print("4. LLM CALL (this may take a while)")
-    print("=" * 60)
-
-    settings = Settings.from_env()
-    print(f"  Model:    {settings.llm_model}")
-    print(f"  Base URL: {settings.llm_base_url}")
-
-    llm = build_chat_model(
-        api_key=settings.llm_api_key,
-        model=settings.llm_model,
-        base_url=settings.llm_base_url,
-    )
-
-    messages = [
-        SystemMessage(content=prompt_messages[0][1]),
-        HumanMessage(content=prompt_messages[1][1]),
-    ]
 
     start = time.time()
-    try:
-        response = llm.invoke(messages)
-        elapsed = time.time() - start
-        answer = response.content if isinstance(response.content, str) else str(response.content)
-        print(f"  Elapsed: {elapsed:.2f}s")
-        print(f"  Response length: {len(answer):,} chars")
-        print()
-        print("  ── LLM RESPONSE ──")
-        print(answer)
-    except Exception as e:
-        elapsed = time.time() - start
-        print(f"  ERROR after {elapsed:.2f}s: {type(e).__name__}: {e}")
+    result = service.get_kwikflows_analysis_data(
+        merchant_mid=MERCHANT_MID,
+        merchant_int_id=MERCHANT_INT_ID,
+    )
+    elapsed = time.time() - start
 
+    print(f"  Elapsed:        {elapsed:.2f}s")
+    print(f"  Total workflows: {result.get('total_workflows', 'N/A')}")
+    print(f"  Active:          {result.get('active_workflows', 'N/A')}")
+    print(f"  Payload size:    {len(json.dumps(result)):,} chars")
+    print()
+
+    for wf in result.get("workflows", []):
+        rules_count = len(wf.get("rules", []))
+        ab = " [AB TEST]" if wf.get("is_ab_test_enabled") else ""
+        print(f"    {wf['workflow_name']}{ab} — {wf.get('workflow_flag', 'N/A')} ({rules_count} rules)")
+    print()
+
+
+def test_kwikflow_impact_data(service: MetricAnalysisService):
+    print("=" * 60)
+    print("4. KWIKFLOW IMPACT DATA")
+    print("=" * 60)
+
+    # First get workflows to find a rule_id
+    workflows = service.get_workflows(merchant_mid=MERCHANT_MID, merchant_int_id=MERCHANT_INT_ID)
+    rule_id = None
+    for wf in workflows:
+        for rule in wf.get("rules", []):
+            if rule.get("rule_id"):
+                rule_id = rule["rule_id"]
+                print(f"  Using rule_id: {rule_id} from workflow: {wf.get('workflow_name')}")
+                break
+        if rule_id:
+            break
+
+    if not rule_id:
+        print("  No rule_id found, skipping impact test")
+        return
+
+    start = time.time()
+    result = service.get_kwikflow_impact_data(
+        merchant_mid=MERCHANT_MID,
+        merchant_int_id=MERCHANT_INT_ID,
+        rule_id=rule_id,
+    )
+    elapsed = time.time() - start
+
+    print(f"  Elapsed:      {elapsed:.2f}s")
+    print(f"  Payload size: {len(json.dumps(result)):,} chars")
+
+    if "error" in result:
+        print(f"  Error: {result['error']}")
+    else:
+        print(f"  Workflow: {result.get('workflow', {}).get('workflow_name', 'N/A')}")
+        impact = result.get("impact_metrics", {})
+        if isinstance(impact, dict):
+            print(f"  Impact keys: {list(impact.keys())}")
+        elif isinstance(impact, list):
+            print(f"  Impact entries: {len(impact)}")
+        else:
+            print(f"  Impact type: {type(impact).__name__}")
     print()
 
 
 if __name__ == "__main__":
-    test_date_parsing()
-    payload = test_data_fetch()
-    prompt_msgs = test_prompt_build(payload)
+    settings = Settings.from_env()
+    service = MetricAnalysisService(
+        api_base_url=settings.api_base_url,
+        api_auth_token=settings.api_auth_token,
+        kwikflows_api_url=settings.kwikflows_api_url,
+        kwikflows_impact_api_url=settings.kwikflows_impact_api_url,
+    )
 
-    # Pass --no-llm to skip the slow LLM call
-    if "--no-llm" not in sys.argv:
-        test_llm_call(prompt_msgs)
-    else:
-        print("Skipping LLM call (--no-llm flag)")
+    test_date_parsing()
+    test_metric_data_fetch(service)
+    test_kwikflows_analysis_data(service)
+    test_kwikflow_impact_data(service)
